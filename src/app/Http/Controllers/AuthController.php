@@ -16,7 +16,7 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            $response = array(
+            $response = array( 
                 'success' => false,
                 'message' => 'Failed to register. Please check your input data',
                 'data' => null,
@@ -32,16 +32,16 @@ class AuthController extends Controller
             'message' => 'Successfully register.',
             'data' => $user
         );
-
+        
         return response()->json($response, 201);
     }
-
+    
     public function login (Request $request) {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string',
             'password' => 'required'
         ]);
-
+        
         if ($validator->fails()) {
             $response = array(
                 'success' => false,
@@ -64,19 +64,61 @@ class AuthController extends Controller
             return response()->json($response, 400);
         }
 
+        $refreshToken = auth()->setTTL(config('jwt.refresh_ttl'))->tokenById(auth()->id());
+
         $response = array(
             'success' => true,
             'message' => 'Successfully login.',
             'data' => auth()->guard('api')->user(),
-            'accesstoken' => $token
-        );
+            'accesstoken' => $token,
+            'kadaluarsa' => 'Lek ws rong dino ra knek digwe',
+            'refreshtoken' => $refreshToken,
+            'kadaluarsaRefresh' => 'Pitung dino, Aman!'
 
+        );
+        
         return response()->json($response, 200);
     }
 
+    public function refresh()
+{
+    $tokenTTL = auth()->factory()->getTTL(); // Waktu TTL dalam menit
+    $tokenIssuedAt = auth()->payload()->get('iat'); // Waktu token dibuat (issued at)
+
+    // Hitung sisa waktu sebelum token expired
+    $timeLeft = ($tokenIssuedAt + ($tokenTTL * 60)) - time();
+
+    // Cek apakah waktu tersisa masih banyak (misal, lebih dari 5 menit)
+    if ($timeLeft > 60) { // 300 detik = 5 menit
+        return response()->json([
+            'success' => false,
+            'message' => 'Kesusu ae rek,lawong yo sk knek digwe',
+            'time_left' => $timeLeft
+        ], 400);
+    }
+
+    // Jika sudah mendekati expired, lakukan refresh
+    try {
+        $newToken = auth()->refresh();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Token refreshed successfully',
+            'access_token' => $newToken,
+            'expires_in' => auth()->factory()->getTTL() * 60
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to refresh token',
+        ], 401);
+    }
+}
+
+
     public function logout(Request $request) {
         if (auth()->check()) {
-            auth()->invalidate(true); // Blacklist token sehingga tidak bisa digunakan lagi
+            auth()->logout(true); // Blacklist token sehingga tidak bisa digunakan lagi
     
             return response()->json([
                 'success' => true,
@@ -167,5 +209,29 @@ class AuthController extends Controller
             'message' => 'Password berhasil direset, silakan login dengan password baru.'
         ], 200);
     }
+
+
+    public function index () {
+		try {
+            $user = User::getUser();
+            $response = array(
+                'succes' => true,
+                'message' => 'Data semua user berhasil ditampilkan',
+                'data' => $user
+            );
+
+            return response()->json($response, 200);
+
+    } catch (Exception $error) {
+        $response = array(
+            'success' => false,
+            'message' => 'Sorry, there error in internal server',
+            'data' => null,
+            'errors' => $error->getMessage()
+        );
+
+        return response()->json($response, 500);
+    }
+}
     
 }
